@@ -10,6 +10,7 @@ require 'faraday_middleware'
 require 'base64'
 require 'uri'
 require 'xmlsimple'
+require 'mimemagic'
 
 module VoiceBase
 
@@ -42,7 +43,6 @@ module VoiceBase
     attr_accessor :debug
     attr_accessor :agent
     attr_accessor :user_agent
-    attr_accessor :cookies
     attr_accessor :api_endpoint
     attr_accessor :croak_on_404
     attr_accessor :language
@@ -112,21 +112,25 @@ module VoiceBase
       #pp token
       return token
     end
-    def get_agent()
+    def get_agent(agent_opts={})
       uri = @host + @api_endpoint
       opts = {
         :url => uri,
-        :ssl => { :verify => false },
+        #:ssl => { :verify => false },
         :headers => {
           'User-Agent'   => @user_agent,
           'Accept'       => 'application/json',
-          'Cookie'       => @cookies
         }
-      }
-      @token = get_oauth_token
+      }.merge(agent_opts)
+
+      @token ||= get_oauth_token
+
       conn = Faraday.new(opts) do |faraday|
+        faraday.request :multipart
         faraday.request :url_encoded
-        [:mashify, :json].each{|mw| faraday.response(mw) }
+        if opts[:headers]['Accept'] == 'application/json'
+          [:mashify, :json].each{|mw| faraday.response(mw) }
+        end
         if !@croak_on_404
           faraday.use VoiceBase::FaradayErrHandler
         else 
@@ -140,23 +144,46 @@ module VoiceBase
       return conn
     end
 
+    def upload(params={})
+      file_path = params[:media]
+      raise "'media' required for upload" unless file_path
+      raise "'media' #{file_path} is not readable" unless File.exists?(file_path)
+
+      # prep params
+      content_type = params[:content_type] || MimeMagic.by_path(file_path).to_s
+      params[:media] = Faraday::UploadIO.new(file_path, content_type) 
+
+      resp = @agent.post @api_endpoint+'/media', params 
+      return VoiceBase::Response.new resp
+    end
+
+    def transcripts(mediaId, opts={})
+      path = "/media/#{mediaId}/transcripts/latest"
+      accept_type = 'application/json'
+      if opts[:format] && opts[:format] != 'json'
+        accept_type = 'text/'+opts[:format]
+      end
+      temp_agent = get_agent({:headers => { 'Accept' => accept_type } })
+      resp = temp_agent.get @api_endpoint+path
+      return VoiceBase::Response.new resp
+    end
+
     def get(path, params={})
       resp = @agent.get @api_endpoint + path, params
       return VoiceBase::Response.new resp
     end 
 
-    def post(params)
-      merged_params = params.merge({version: @api_version, token: @token})
-      resp = @agent.post '', merged_params
+    def post(path, params={})
+      resp = @agent.post @api_endpoint + path, params
       return VoiceBase::Response.new resp
     end
 
     def method_missing(meth, args, &block)
       #STDERR.puts "action=#{meth} args=#{args.inspect}"
       if args.size > 0
-        post args.merge({ action: meth })
+        get meth, args
       else
-        post action: meth
+        get meth
       end
     end
 
@@ -186,6 +213,10 @@ module VoiceBase
 
     def is_success()
       return @is_ok
+    end
+
+    def body
+      @http_resp.body
     end
 
     def method_missing(meth, *args, &block)
