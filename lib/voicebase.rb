@@ -7,7 +7,7 @@
 require 'rubygems'
 require 'json'
 require 'faraday_middleware'
-require 'oauth2'
+require 'base64'
 require 'uri'
 require 'xmlsimple'
 
@@ -48,7 +48,7 @@ module VoiceBase
     attr_accessor :language
 
     def version
-      return "1.0.0"
+      return "2.0.0"
     end
 
     def initialize(args)
@@ -59,10 +59,10 @@ module VoiceBase
       @auth_id             = args[:id]
       @auth_secret         = args[:secret]
       @oauth_redir_uri     = args[:redir_uri] || 'urn:ietf:wg:oauth:2.0:oob'
-      @host                = args[:host] || 'https://api.voicebase.com'
+      @host                = args[:host] || 'https://apis.voicebase.com'
       @debug               = args[:debug]
       @user_agent          = args[:user_agent] || 'voicebase-client-ruby/'+version()
-      @api_endpoint        = args[:api_endpoint] || '/services'
+      @api_endpoint        = args[:api_endpoint] || '/v2-beta'
       @croak_on_404        = args[:croak_on_404] || false
       @language            = args[:language] || 'en'  # US English
 
@@ -80,30 +80,50 @@ module VoiceBase
       end
 
       @agent = get_agent
-      @token = get_auth_token
+
     end
 
-    def get_auth_token
-      resp = VoiceBase::Response.new @agent.post('', {
-        version: @api_version, 
-        apiKey: @auth_id, 
-        password: @auth_secret, 
-        action: 'getToken', 
-        timeout: 1440
-      }) 
-      resp.token
-    end
+    def get_oauth_token(options={})
+      auth_hash = Base64.encode64( "#{@auth_id}:#{@auth_secret}" ).strip
+      #STDERR.puts "auth: #{@auth_id}:#{@auth_secret} => #{auth_hash}"
+      opts = {
+        :url => @host,
+        #:ssl => { :verify => false },
+        :headers => {
+          'User-Agent' => @user_agent,
+          'Accept'     => 'application/json',
+        }
+      } 
+      conn = Faraday.new(opts) do |faraday|
+        faraday.request :url_encoded
+        [:mashify, :json].each{|mw| faraday.response(mw) }
+        if !@croak_on_404
+          faraday.use VoiceBase::FaradayErrHandler
+        else 
+          faraday.response(:raise_error)
+        end 
+        faraday.request :authorization, 'Basic', auth_hash
+        faraday.response :logger if @debug
+        faraday.adapter  :excon   # IMPORTANT this is last
+      end        
 
+      resp = conn.get @api_endpoint + '/access/users/admin/tokens'
+      token = resp.body["tokens"].first['token']
+      #pp token
+      return token
+    end
     def get_agent()
       uri = @host + @api_endpoint
       opts = {
         :url => uri,
+        :ssl => { :verify => false },
         :headers => {
           'User-Agent'   => @user_agent,
           'Accept'       => 'application/json',
           'Cookie'       => @cookies
         }
       }
+      @token = get_oauth_token
       conn = Faraday.new(opts) do |faraday|
         faraday.request :url_encoded
         [:mashify, :json].each{|mw| faraday.response(mw) }
@@ -112,12 +132,18 @@ module VoiceBase
         else 
           faraday.response(:raise_error)
         end
+        faraday.request :authorization, 'Bearer', @token
         faraday.response :logger if @debug
         faraday.adapter  :excon   # IMPORTANT this is last
       end
 
       return conn
     end
+
+    def get(path, params={})
+      resp = @agent.get @api_endpoint + path, params
+      return VoiceBase::Response.new resp
+    end 
 
     def post(params)
       merged_params = params.merge({version: @api_version, token: @token})

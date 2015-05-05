@@ -31,7 +31,7 @@ def get_vb_client
   :id => AUTH_ID,
   :secret => AUTH_SECRET,
   # must duplicate env var because we modify it with gsub
-  :host   => (ENV['VB_HOST'] || 'https://api.voicebase.com').dup.to_s,
+  :host   => (ENV['VB_HOST'] || 'https://apis.voicebase.com').dup.to_s,
   :debug  => ENV['VB_DEBUG'],
   #:croak_on_404 => true
   )
