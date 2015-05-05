@@ -14,7 +14,11 @@ client = VoiceBase::Client.new(
   :secret => 'vb_sekrit_password',
 )
 
-resp = client.getOfferings length: 10, language: client.language
+resp = client.get '/media'
 
 ```
+
+The master branch implements version 2 of the VoiceBase API.
+
+See the **v1** branch for the API version 1.
 
