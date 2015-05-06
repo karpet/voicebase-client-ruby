@@ -9,7 +9,6 @@ require 'json'
 require 'faraday_middleware'
 require 'base64'
 require 'uri'
-require 'xmlsimple'
 require 'mimemagic'
 
 module VoiceBase

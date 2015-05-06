@@ -15,9 +15,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "excon"
   s.add_runtime_dependency "hashie"
   s.add_runtime_dependency "mimemagic"
-  s.add_runtime_dependency "xml-simple"
   s.add_development_dependency "rspec"
   s.add_development_dependency "dotenv"
-  s.add_development_dependency "mime-types"
 
 end
