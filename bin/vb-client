@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+
+# if run from git checkout
+$:.unshift File.dirname(__FILE__)+'/../lib'
+
+require 'voicebase'
+require 'json'
+require 'pp'
+require 'dotenv'
+
+Dotenv.load
+
+# assumes ID and SECRET set in env vars
+AUTH_ID     = ENV['VB_ID']
+AUTH_SECRET = ENV['VB_SECRET']
+if !AUTH_ID or !AUTH_SECRET
+  abort("Must set VB_ID and VB_SECRET env vars -- did you create a .env file?")
+end
+
+client = VoiceBase::Client.new(
+  :id => AUTH_ID,
+  :secret => AUTH_SECRET,
+  # must duplicate env var because we modify it with gsub
+  :host   => (ENV['VB_HOST'] || 'https://apis.voicebase.com').dup.to_s,
+  :debug  => ENV['VB_DEBUG'],
+  #:croak_on_404 => true
+)
+
+resp = client.get('/media')
+#pp( resp )
+resp.media.each do |m| 
+  puts "/media has #{m.inspect}"
+end
