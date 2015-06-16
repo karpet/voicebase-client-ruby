@@ -39,6 +39,28 @@ describe VoiceBase::Client do
       # TODO poll for finish?
     end
 
+    if ENV['VB_CALLBACK_URL']
+      it "should upload media with callback" do
+        client = get_vb_client
+        conf = { 
+          configuration: { 
+            transcripts: { engine: "premium" },
+            publish: { 
+              callbacks: [{ 
+                method: "POST", 
+                include: ["transcripts", "topics", "metadata"], 
+                url: ENV['VB_CALLBACK_URL']
+              }]
+            }
+          } 
+        }.to_json
+        resp = client.upload media: ENV['VB_TEST_UPLOAD'], configuration: conf
+        expect(resp.status).to eq 200
+        expect(resp.mediaId).not_to be_empty
+        STDERR.puts "upload saved with mediaId #{resp.mediaId} for callback #{ENV['VB_CALLBACK_URL']}"
+      end
+    end
+
   end
 
   if ENV['VB_TEST_MEDIA_ID']
