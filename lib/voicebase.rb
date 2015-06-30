@@ -83,7 +83,7 @@ module VoiceBase
     end
 
     def get_oauth_token(options={})
-      auth_hash = Base64.encode64( "#{@auth_id}:#{@auth_secret}" ).strip
+      auth_hash = Base64.strict_encode64( "#{@auth_id}:#{@auth_secret}" ).strip
       #STDERR.puts "auth: #{@auth_id}:#{@auth_secret} => #{auth_hash}"
       opts = {
         :url => @host,
