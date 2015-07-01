@@ -7,6 +7,28 @@ require 'voicebase'
 require 'json'
 require 'pp'
 require 'dotenv'
+require 'getoptlong'
+
+usage = <<EOF
+#{$0} [OPTION]
+
+-h, --help:
+   show help
+
+-l, --list:
+   list all jobs
+
+-j <id>, --job <id>:
+   show job details for <id>
+
+-t <id>, --transcript <id>:
+   show transcript for <id>
+
+-c <path/to/file>, --create <path/to/file>
+   upload path/to/file and create transcription job
+
+EOF
+
 
 Dotenv.load
 
@@ -15,6 +37,38 @@ AUTH_ID     = ENV['VB_ID']
 AUTH_SECRET = ENV['VB_SECRET']
 if !AUTH_ID or !AUTH_SECRET
   abort("Must set VB_ID and VB_SECRET env vars -- did you create a .env file?")
+end
+
+opts = GetoptLong.new(
+  [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
+  [ '--list', '-l', GetoptLong::NO_ARGUMENT ],
+  [ '--debug', '-d', GetoptLong::NO_ARGUMENT ],
+  [ '--job',  '-j', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--transcript', '-t', GetoptLong::REQUIRED_ARGUMENT ],
+  [ '--create', '-c', GetoptLong::REQUIRED_ARGUMENT ],
+)
+
+job_id = nil
+upload_file = nil
+job_list = nil
+transcript_id = nil
+debug = false
+opts.each do |opt, arg|
+  case opt
+    when '--help'
+      puts usage
+      exit
+    when '--debug'
+      debug = true
+    when '--list'
+      job_list = true
+    when '--job'
+      job_id = arg.to_i
+    when '--transcript'
+      transcript_id = arg.to_i
+    when '--create'
+      upload_file = arg
+  end
 end
 
 client = VoiceBase::Client.new(
@@ -26,8 +80,16 @@ client = VoiceBase::Client.new(
   #:croak_on_404 => true
 )
 
-resp = client.get('/media')
-#pp( resp )
-resp.media.each do |m| 
-  puts "/media has #{m.inspect}"
+if job_id
+  resp = client.get('/media/'+job_id)
+  pp resp
+elsif job_list
+  resp = client.get('/media')
+  resp.media.each do |m| 
+    puts "/media/#{m.mediaId} status:#{m.status}"
+    debug and puts "[#{m.inspect}]"
+  end
+else
+  puts usage
 end
+
