@@ -66,7 +66,7 @@ opts.each do |opt, arg|
     when '--list'
       job_list = true
     when '--job'
-      job_id = arg.to_i
+      job_id = arg
     when '--transcript'
       transcript_id = arg.to_i
     when '--create'
