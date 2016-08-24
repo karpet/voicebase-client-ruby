@@ -18,6 +18,26 @@ describe VoiceBase::Client do
     end
   end
 
+  if ENV['VB_TEST_UPLOAD_URL']
+    it "should upload media from an url" do
+      client = get_vb_client
+      resp = client.upload media: ENV['VB_TEST_UPLOAD_URL']
+      expect(resp.status).to eq 200
+      expect(resp.mediaId).not_to be_empty
+      STDERR.puts "upload saved with mediaId #{resp.mediaId}"
+    end
+
+    it "should upload media with premium" do
+      client = get_vb_client
+      conf = { configuration: { transcripts: { engine: "premium" } } }.to_json
+      resp = client.upload media: ENV['VB_TEST_UPLOAD_URL'], configuration: conf
+      expect(resp.status).to eq 200
+      expect(resp.mediaId).not_to be_empty
+      STDERR.puts "upload saved with mediaId #{resp.mediaId}"
+      # TODO poll for finish?
+    end
+  end
+
   if ENV['VB_TEST_UPLOAD']
 
     it "should upload media" do

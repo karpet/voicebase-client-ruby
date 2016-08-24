@@ -144,15 +144,22 @@ module VoiceBase
     end
 
     def upload(params={})
-      file_path = params[:media]
-      raise "'media' required for upload" unless file_path
-      raise "'media' #{file_path} is not readable" unless File.exists?(file_path)
+      media = params[:media]
+      raise "'media' required for upload" unless media
 
-      # prep params
-      content_type = params[:content_type] || MimeMagic.by_path(file_path).to_s
-      params[:media] = Faraday::UploadIO.new(file_path, content_type) 
+      headers = {}
+      case
+      when File.exists?(media)
+        content_type = params[:content_type] || MimeMagic.by_path(media).to_s
+        params[:media] = Faraday::UploadIO.new(media, content_type)
+      when media =~ URI::regexp
+        params[:media] = media
+        headers[:content_type] = 'multipart/form-data'
+      else
+        raise "'media' #{media} should be either a file path or an url"
+      end
 
-      resp = @agent.post @api_endpoint+'/media', params 
+      resp = @agent.post @api_endpoint+'/media', params, headers
       return VoiceBase::Response.new resp
     end
 
